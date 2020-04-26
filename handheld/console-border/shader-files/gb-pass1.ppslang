@@ -1,0 +1,135 @@
+#version 450
+
+layout(push_constant)uniform Push
+{
+ vec4 OutputSize;
+ vec4 OriginalSize;
+ vec4 SourceSize;
+ float blending_mode;
+ float adjacent_texel_alpha_blending;
+} registers;
+
+layout(std140, set = 0, binding = 0)uniform UBO
+{
+    mat4 MVP;
+} global;
+
+
+
+
+
+
+
+#pragma parameterblending_mode¡0.00.01.01.0
+
+
+#pragma parameteradjacent_texel_alpha_blending¡0.380.01.00.05
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#pragma stagevertex
+layout(location = 0)in vec4 Position;
+layout(location = 1)in vec2 TexCoord;
+layout(location = 0)out vec2 vTexCoord;
+layout(location = 1)out vec2 texel;
+layout(location = 2)out vec2 blur_coords_up;
+layout(location = 3)out vec2 blur_coords_down;
+layout(location = 4)out vec2 blur_coords_right;
+layout(location = 5)out vec2 blur_coords_left;
+layout(location = 6)out vec2 blur_coords_lower_bound;
+layout(location = 7)out vec2 blur_coords_upper_bound;
+
+void main()
+{
+    gl_Position = global . MVP * Position;
+    vTexCoord = TexCoord;
+
+    texel = registers . SourceSize . zw;
+    blur_coords_down = vTexCoord + vec2(0.0, texel . y);
+    blur_coords_up = vTexCoord + vec2(0.0, - texel . y);
+    blur_coords_right = vTexCoord + vec2(texel . x, 0.0);
+    blur_coords_left = vTexCoord + vec2(- texel . x, 0.0);
+    blur_coords_lower_bound = vec2(0.0);
+    blur_coords_upper_bound = texel *(registers . OutputSize . xy - vec2(2.0));
+}
+
+
+
+
+
+#pragma stagefragment
+layout(location = 0)in vec2 vTexCoord;
+layout(location = 1)in vec2 texel;
+layout(location = 2)in vec2 blur_coords_up;
+layout(location = 3)in vec2 blur_coords_down;
+layout(location = 4)in vec2 blur_coords_right;
+layout(location = 5)in vec2 blur_coords_left;
+layout(location = 6)in vec2 blur_coords_lower_bound;
+layout(location = 7)in vec2 blur_coords_upper_bound;
+layout(location = 0)out vec4 FragColor;
+layout(set = 0, binding = 2)uniform sampler2D Source;
+
+
+
+
+
+float blending_modifier(float color){
+ float blend_bool =(color == 0.0)? 1 : 0;
+ return clamp(blend_bool + registers . blending_mode, 0.0, 1.0);
+}
+
+void main()
+{
+
+
+
+
+
+    vec4 out_color = texture(Source, vTexCoord). rgba;
+
+
+    vec2 blur_coords_up_clamped = clamp(blur_coords_up, blur_coords_lower_bound, blur_coords_upper_bound);
+    vec2 blur_coords_down_clamped = clamp(blur_coords_down, blur_coords_lower_bound, blur_coords_upper_bound);
+    vec2 blur_coords_right_clamped = clamp(blur_coords_right, blur_coords_lower_bound, blur_coords_upper_bound);
+    vec2 blur_coords_left_clamped = clamp(blur_coords_left, blur_coords_lower_bound, blur_coords_upper_bound);
+
+
+    vec4 adjacent_texel_1 = texture(Source, blur_coords_up_clamped). rgba;
+    vec4 adjacent_texel_2 = texture(Source, blur_coords_down_clamped). rgba;
+    vec4 adjacent_texel_3 = texture(Source, blur_coords_right_clamped). rgba;
+    vec4 adjacent_texel_4 = texture(Source, blur_coords_left_clamped). rgba;
+
+
+    out_color . a -=
+    (
+        (out_color . a - adjacent_texel_1 . a)+
+        (out_color . a - adjacent_texel_2 . a)+
+        (out_color . a - adjacent_texel_3 . a)+
+        (out_color . a - adjacent_texel_4 . a)
+    )* registers . adjacent_texel_alpha_blending * blending_modifier(out_color . a);
+
+    FragColor = out_color;
+}

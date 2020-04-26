@@ -1,0 +1,319 @@
+#version 150
+#define float2 vec2
+#define float3 vec3
+#define float4 vec4
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+uniform Push
+{
+   vec4 SourceSize;
+   vec4 OriginalSize;
+   vec4 OutputSize;
+   uint FrameCount;
+}params;
+
+layout(std140) uniform UBO
+{
+   mat4 MVP;
+}global;
+
+
+
+float coef = 2.0;
+vec4 eq_threshold = vec4(15.0, 15.0, 15.0, 15.0);
+float y_weight = 48.0;
+float u_weight = 7.0;
+float v_weight = 6.0;
+mat3x3 yuv = mat3x3(0.299, 0.587, 0.114, - 0.169, - 0.331, 0.499, 0.499, - 0.418, - 0.0813);
+mat3x3 yuv_weighted = mat3x3(y_weight * yuv[0], u_weight * yuv[1], v_weight * yuv[2]);
+vec4 delta = vec4(0.5, 0.5, 0.5, 0.5);
+float sharpness = 0.65;
+
+
+
+
+
+
+
+
+
+float lum(vec3 A, vec3 B)
+{
+    return abs(dot(A - B, yuv_weighted[0]));
+}
+
+vec4 df(vec4 A, vec4 B)
+{
+    return vec4(abs(A - B));
+}
+
+bvec4 eq(vec4 A, vec4 B)
+{
+    return lessThan(df(A, B), vec4(15.0, 15.0, 15.0, 15.0));
+}
+
+bvec4 eq2(vec4 A, vec4 B)
+{
+    return lessThan(df(A, B), vec4(2.0, 2.0, 2.0, 2.0));
+}
+
+bvec4 eq3(vec4 A, vec4 B)
+{
+    return lessThan(df(A, B), vec4(5.0, 5.0, 5.0, 5.0));
+}
+
+
+vec4 weighted_distance(vec4 a, vec4 b, vec4 c, vec4 d, vec4 e, vec4 f, vec4 g, vec4 h)
+{
+    return(df(a, b)+ df(a, c)+ df(d, e)+ df(d, f)+ 4.0 * df(g, h));
+}
+
+bvec4 and(bvec4 A, bvec4 B)
+{
+ return bvec4(A . x && B . x, A . y && B . y, A . z && B . z, A . w && B . w);
+}
+
+bvec4 or(bvec4 A, bvec4 B)
+{
+ return bvec4(A . x || B . x, A . y || B . y, A . z || B . z, A . w || B . w);
+}
+
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 1) in vec4 t1;
+layout(location = 2) in vec4 t2;
+layout(location = 3) in vec4 t3;
+layout(location = 4) in vec4 t4;
+layout(location = 5) in vec4 t5;
+layout(location = 6) in vec4 t6;
+layout(location = 7) in vec4 t7;
+layout(location = 0) out vec4 FragColor;
+uniform sampler2D Source;
+
+void main()
+{
+    bvec4 edr, edr_left, edr_up, px;
+    bvec4 interp_restriction_lv1, interp_restriction_lv2_left, interp_restriction_lv2_up;
+    bvec4 nc, nc30, nc60, nc45;
+    vec4 fx, fx_left, fx_up, final_fx;
+
+    vec2 fp = fract(vTexCoord * params . SourceSize . xy);
+
+    vec3 A1 = texture(Source, t1 . xw). rgb;
+    vec3 B1 = texture(Source, t1 . yw). rgb;
+    vec3 C1 = texture(Source, t1 . zw). rgb;
+
+    vec3 A = texture(Source, t2 . xw). rgb;
+    vec3 B = texture(Source, t2 . yw). rgb;
+    vec3 C = texture(Source, t2 . zw). rgb;
+
+    vec3 D = texture(Source, t3 . xw). rgb;
+    vec3 E = texture(Source, t3 . yw). rgb;
+    vec3 F = texture(Source, t3 . zw). rgb;
+
+    vec3 G = texture(Source, t4 . xw). rgb;
+    vec3 H = texture(Source, t4 . yw). rgb;
+    vec3 I = texture(Source, t4 . zw). rgb;
+
+    vec3 G5 = texture(Source, t5 . xw). rgb;
+    vec3 H5 = texture(Source, t5 . yw). rgb;
+    vec3 I5 = texture(Source, t5 . zw). rgb;
+
+    vec3 A0 = texture(Source, t6 . xy). rgb;
+    vec3 D0 = texture(Source, t6 . xz). rgb;
+    vec3 G0 = texture(Source, t6 . xw). rgb;
+
+    vec3 C4 = texture(Source, t7 . xy). rgb;
+    vec3 F4 = texture(Source, t7 . xz). rgb;
+    vec3 I4 = texture(Source, t7 . xw). rgb;
+
+    vec4 b =(yuv_weighted[0]* mat4x3(B, D, H, F));
+    vec4 c =(yuv_weighted[0]* mat4x3(C, A, G, I));
+    vec4 e =(yuv_weighted[0]* mat4x3(E, E, E, E));
+    vec4 a = c . yzwx;
+    vec4 d = b . yzwx;
+    vec4 f = b . wxyz;
+    vec4 g = c . zwxy;
+    vec4 h = b . zwxy;
+    vec4 i = c . wxyz;
+
+    vec4 i4 =(yuv_weighted[0]* mat4x3(I4, C1, A0, G5));
+    vec4 i5 =(yuv_weighted[0]* mat4x3(I5, C4, A1, G0));
+    vec4 h5 =(yuv_weighted[0]* mat4x3(H5, F4, B1, D0));
+    vec4 f4 = h5 . yzwx;
+
+
+    vec4 Ao = vec4(1.0, - 1.0, - 1.0, 1.0);
+    vec4 Bo = vec4(1.0, 1.0, - 1.0, - 1.0);
+    vec4 Co = vec4(1.5, 0.5, - 0.5, 0.5);
+    vec4 Ax = vec4(1.0, - 1.0, - 1.0, 1.0);
+    vec4 Bx = vec4(0.5, 2.0, - 0.5, - 2.0);
+    vec4 Cx = vec4(1.0, 1.0, - 0.5, 0.0);
+    vec4 Ay = vec4(1.0, - 1.0, - 1.0, 1.0);
+    vec4 By = vec4(2.0, 0.5, - 2.0, - 0.5);
+    vec4 Cy = vec4(2.0, 0.0, - 1.0, 0.5);
+
+
+    fx =(Ao * fp . y + Bo * fp . x);
+    fx_left =(Ax * fp . y + Bx * fp . x);
+    fx_up =(Ay * fp . y + By * fp . x);
+
+
+ bvec4 block1 = and(not(eq(h, h5)), not(eq(h, i5)));
+ bvec4 block2 = and(not(eq(f, f4)), not(eq(f, i4)));
+ bvec4 block3 = and(not(eq(h, d)), not(eq(h, g)));
+ bvec4 block4 = and(not(eq(f, b)), not(eq(f, c)));
+ bvec4 block5 = and(eq(e, i), or(block2, block1));
+
+ bvec4 block_comp = or(block4, or(block3, or(block5, or(eq(e, g), eq(e, c)))));
+
+    interp_restriction_lv1 = and(notEqual(e, f), and(notEqual(e, h), block_comp));
+    interp_restriction_lv2_left = and(notEqual(e, g), notEqual(d, g));
+    interp_restriction_lv2_up = and(notEqual(e, c), notEqual(b, c));
+
+    vec4 fx45 = smoothstep(Co - delta, Co + delta, fx);
+    vec4 fx30 = smoothstep(Cx - delta, Cx + delta, fx_left);
+    vec4 fx60 = smoothstep(Cy - delta, Cy + delta, fx_up);
+
+
+    edr = and(lessThan((weighted_distance(e, c, g, i, h5, f4, h, f)+ 3.5), weighted_distance(h, d, i5, f, i4, b, e, i)), interp_restriction_lv1);
+    edr_left = and(lessThanEqual((coef * df(f, g)), df(h, c)), interp_restriction_lv2_left);
+    edr_up = and(greaterThanEqual(df(f, g),(coef * df(h, c))), interp_restriction_lv2_up);
+
+    nc45 = and(edr, bvec4(fx45));
+    nc30 = and(edr, and(edr_left, bvec4(fx30)));
+    nc60 = and(edr, and(edr_up, bvec4(fx60)));
+
+    px = lessThanEqual(df(e, f), df(e, h));
+
+    vec3 res = E;
+
+
+    vec3 n1, n2, n3, n4, s, aa, bb, cc, dd;
+
+
+    n1 = B1;n2 = B;s = E;n3 = H;n4 = H5;
+    aa = n2 - n1;bb = s - n2;cc = n3 - s;dd = n4 - n3;
+
+    vec3 t =(7. *(bb + cc)- 3. *(aa + dd))/ 16.;
+
+    vec3 m;
+ m . x =(s . x < 0.5)? 2. * s . x : 2. *(1.0 - s . x);
+ m . y =(s . y < 0.5)? 2. * s . y : 2. *(1.0 - s . y);
+ m . z =(s . z < 0.5)? 2. * s . z : 2. *(1.0 - s . z);
+
+        m = min(m, sharpness * abs(bb));
+        m = min(m, sharpness * abs(cc));
+
+    t = clamp(t, - m, m);
+
+
+    vec3 s1 =(2. * fp . y - 1)* t + s;
+
+    n1 = D0;n2 = D;s = s1;n3 = F;n4 = F4;
+    aa = n2 - n1;bb = s - n2;cc = n3 - s;dd = n4 - n3;
+
+    t =(7. *(bb + cc)- 3. *(aa + dd))/ 16.;
+
+ m . x =(s . x < 0.5)? 2. * s . x : 2. *(1.0 - s . x);
+ m . y =(s . y < 0.5)? 2. * s . y : 2. *(1.0 - s . y);
+ m . z =(s . z < 0.5)? 2. * s . z : 2. *(1.0 - s . z);
+
+        m = min(m, sharpness * abs(bb));
+        m = min(m, sharpness * abs(cc));
+
+    t = clamp(t, - m, m);
+
+    vec3 s0 =(2. * fp . x - 1)* t + s;
+
+
+    nc = or(nc30, or(nc60, nc45));
+
+    float blend = 0.0;
+    vec3 pix;
+
+    vec4 r1 = mix(e, f, edr);
+
+    bool yeseq3 = false;
+    bvec4 yes;
+
+    if(all(eq3(r1, e)))
+    {
+        yeseq3 = true;
+        pix = res = s0;
+    }
+    else
+    {
+        pix = res = E;
+    }
+
+    yes = and(bvec4(yeseq3), eq2(e, mix(f, h, px)));
+
+ vec4 final45 = vec4(nc45)* fx45;
+ vec4 final30 = vec4(nc30)* fx30;
+ vec4 final60 = vec4(nc60)* fx60;
+
+    vec4 maximo = max(max(final30, final60), final45);
+
+         if(nc . x){ pix = px . x ? F : H;blend = maximo . x;if(yes . x)pix = res = s0;else res = E;}
+    else if(nc . y){ pix = px . y ? B : F;blend = maximo . y;if(yes . y)pix = res = s0;else res = E;}
+    else if(nc . z){ pix = px . z ? D : B;blend = maximo . z;if(yes . z)pix = res = s0;else res = E;}
+    else if(nc . w){ pix = px . w ? H : D;blend = maximo . w;if(yes . w)pix = res = s0;else res = E;}
+
+    res = pow(res, vec3(2.4, 2.4, 2.4));
+    pix = pow(pix, vec3(2.4, 2.4, 2.4));
+
+    res = mix(res, pix, blend);
+
+   FragColor = vec4(clamp(pow(res, vec3(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2)), 0.0, 1.0), 1.0);
+}

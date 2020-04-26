@@ -1,0 +1,57 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+#line 1 "../../../slang-shaders/crt/shaders/gtu-v050/pass1.slang"
+
+
+layout(push_constant)uniform Push
+{
+ vec4 OutputSize;
+ vec4 OriginalSize;
+ vec4 SourceSize;
+ float compositeConnection;
+} params;
+
+
+
+layout(std140, set = 0, binding = 0)uniform UBO
+{
+ mat4 MVP;
+} global;
+
+
+
+
+
+
+
+#line 1 "../../../slang-shaders/crt/shaders/gtu-v050/config.h"
+#pragma parametercompositeConnection¡0.00.01.01.0
+
+
+#line 25 "../../../slang-shaders/crt/shaders/gtu-v050/pass1.slang"
+
+
+
+#pragma stagevertex
+layout(location = 0)in vec4 Position;
+layout(location = 1)in vec2 TexCoord;
+layout(location = 0)out vec2 vTexCoord;
+
+void main()
+{
+   gl_Position = global . MVP * Position;
+   vTexCoord = TexCoord;
+}
+
+#pragma stagefragment
+layout(location = 0)in vec2 vTexCoord;
+layout(location = 0)out vec4 FragColor;
+layout(set = 0, binding = 2)uniform sampler2D Source;
+
+void main()
+{
+ vec4 c = texture(Source, vTexCoord);
+ if(params . compositeConnection > 0.0)
+  c . rgb = c . rgb * mat3x3(0.299, 0.595716, 0.211456, 0.587, - 0.274453, - 0.522591, 0.114, - 0.321263, 0.311135);
+   FragColor = c;
+}

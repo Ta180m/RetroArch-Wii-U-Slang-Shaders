@@ -1,0 +1,175 @@
+#version 150
+#define float2 vec2
+#define float3 vec3
+#define float4 vec4
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+uniform Push
+{
+   vec4 SourceSize;
+   vec4 OriginalSize;
+   vec4 OutputSize;
+   uint FrameCount;
+}params;
+
+layout(std140) uniform UBO
+{
+   mat4 MVP;
+}global;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+vec3 dtt = vec3(65536, 255, 1);
+
+float reduce(vec3 color)
+{
+ return dot(color, dtt);
+}
+
+     vec3 bilinear(float p, float q, vec3 A, vec3 B, vec3 C, vec3 D)
+{
+ return((1 - p)*(1 - q)* A + p *(1 - q)* B +(1 - p)* q * C + p * q * D);
+}
+
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 1) in vec4 t1;
+layout(location = 2) in vec2 loc;
+layout(location = 0) out vec4 FragColor;
+uniform sampler2D Source;
+
+void main()
+{
+      vec2 pos = fract(loc * 1.00001)- vec2(0.4999, 0.4999);
+      vec2 dir = sign(pos);
+
+      vec2 g1 = dir * t1 . xy;
+      vec2 g2 = dir * t1 . zw;
+
+      vec3 A = texture(Source, vTexCoord). xyz;
+      vec3 B = texture(Source, vTexCoord + g1). xyz;
+      vec3 C = texture(Source, vTexCoord + g2). xyz;
+      vec3 D = texture(Source, vTexCoord + g1 + g2). xyz;
+
+      vec3 C00 = texture(Source, vTexCoord - g1 - g2). xyz;
+      vec3 C01 = texture(Source, vTexCoord - g2). xyz;
+      vec3 C02 = texture(Source, vTexCoord + g1 - g2). xyz;
+      vec3 C03 = texture(Source, vTexCoord + 2.0 * g1 - g2). xyz;
+
+      vec3 C10 = texture(Source, vTexCoord - g1). xyz;
+      vec3 C20 = texture(Source, vTexCoord - g1 + g2). xyz;
+      vec3 C13 = texture(Source, vTexCoord + 2.0 * g1). xyz;
+      vec3 C23 = texture(Source, vTexCoord + 2.0 * g1 + g2). xyz;
+
+      vec3 C30 = texture(Source, vTexCoord - g1 + 2.0 * g2). xyz;
+      vec3 C31 = texture(Source, vTexCoord + 2.0 * g2). xyz;
+      vec3 C32 = texture(Source, vTexCoord + g1 + 2.0 * g2). xyz;
+      vec3 C33 = texture(Source, vTexCoord + 2.0 * g1 + 2.0 * g2). xyz;
+
+ float a = reduce(A);
+ float b = reduce(B);
+ float c = reduce(C);
+ float d = reduce(D);
+
+ float c00 = reduce(C00);
+ float c01 = reduce(C01);
+ float c02 = reduce(C02);
+ float c03 = reduce(C03);
+
+ float c10 = reduce(C10);
+ float c20 = reduce(C20);
+ float c13 = reduce(C13);
+ float c23 = reduce(C23);
+
+ float c30 = reduce(C30);
+ float c31 = reduce(C31);
+ float c32 = reduce(C32);
+ float c33 = reduce(C33);
+
+ float p = abs(pos . x);
+ float q = abs(pos . y);
+
+ float k = distance(pos, g1);
+ float l = distance(pos, g2);
+
+ float count1 = 0.0;
+ float count2 = 0.0;
+
+ count1 += float(abs(c00 - a)< abs(c01 - c10));
+ count2 += float(abs(c00 - a)> abs(c01 - c10));
+ count1 += float(abs(c01 - b)< abs(c02 - a));
+ count2 += float(abs(c01 - b)> abs(c02 - a));
+ count1 += float(abs(c02 - c13)< abs(c03 - b));
+ count2 += float(abs(c02 - c13)> abs(c03 - b));
+ count1 += float(abs(c10 - c)< abs(c20 - a));
+ count2 += float(abs(c10 - c)> abs(c20 - a));
+ count1 += float(abs(b - c23)< abs(c13 - d));
+ count2 += float(abs(b - c23)> abs(c13 - d));
+ count1 += float(abs(c20 - c31)< abs(c - c30));
+ count2 += float(abs(c20 - c31)> abs(c - c30));
+ count1 += float(abs(c32 - c)< abs(c31 - d));
+ count2 += float(abs(c32 - c)> abs(c31 - d));
+ count1 += float(abs(c33 - d)< abs(c32 - c23));
+ count2 += float(abs(c33 - d)> abs(c32 - c23));
+
+ if((count1 >= 5.0)||((abs(a - d)< abs(b - c))&& count2 <= 4.0))
+ {
+  if(k < l)
+  {
+   C = A + D - B;
+  }
+  else if(k >= l)
+  {
+   B = A + D - C;
+  }
+ }
+ else if((count2 >= 5.0)||(abs(a - d)> abs(b - c)))
+ {
+  D = B + C - A;
+ }
+
+      vec3 color = bilinear(p, q, A, B, C, D);
+
+   FragColor = vec4(color, 1.0);
+}

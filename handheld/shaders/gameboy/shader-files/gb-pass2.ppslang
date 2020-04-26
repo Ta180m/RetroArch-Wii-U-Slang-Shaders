@@ -1,0 +1,117 @@
+#version 450
+
+layout(push_constant)uniform Push
+{
+ vec4 OutputSize;
+ vec4 OriginalSize;
+ vec4 SourceSize;
+} registers;
+
+layout(std140, set = 0, binding = 0)uniform UBO
+{
+    mat4 MVP;
+} global;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#pragma stagevertex
+layout(location = 0)in vec4 Position;
+layout(location = 1)in vec2 TexCoord;
+layout(location = 0)out vec2 vTexCoord;
+layout(location = 1)out vec2 texel;
+layout(location = 2)out vec2 lower_bound;
+layout(location = 3)out vec2 upper_bound;
+
+void main()
+{
+    gl_Position = global . MVP * Position;
+    vTexCoord = TexCoord * 1.0001;
+
+    texel = registers . SourceSize . zw;
+    lower_bound = vec2(0.0);
+    upper_bound = vec2(texel *(registers . OutputSize . xy - 1.0));
+}
+
+#pragma stagefragment
+layout(location = 0)in vec2 vTexCoord;
+layout(location = 1)in vec2 texel;
+layout(location = 2)in vec2 lower_bound;
+layout(location = 3)in vec2 upper_bound;
+layout(location = 0)out vec4 FragColor;
+layout(set = 0, binding = 2)uniform sampler2D Source;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void main()
+{
+
+    float offsets[5]= float[](0.0, 1.0, 2.0, 3.0, 4.0);
+
+
+
+
+
+
+
+
+
+    float weights[5]= float[](0.13465834124289953661305802732548,
+                                0.13051534237555914090930704141833,
+                                0.11883557904592230273554609080014,
+                                0.10164546793794160274995705611009,
+                                0.08167444001912718529866079800870);
+
+
+    vec4 out_color = texture(Source, clamp(vTexCoord, lower_bound, upper_bound))* weights[0];
+
+
+
+    for(int i = 1;i < 5;i ++)
+    {
+        out_color . a += texture(Source, clamp(vTexCoord + vec2(offsets[i]* texel . x, 0.0), lower_bound, upper_bound)). a * weights[i];
+        out_color . a += texture(Source, clamp(vTexCoord - vec2(offsets[i]* texel . x, 0.0), lower_bound, upper_bound)). a * weights[i];
+    }
+
+    FragColor = out_color;
+}

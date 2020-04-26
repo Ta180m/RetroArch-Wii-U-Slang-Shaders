@@ -1,0 +1,91 @@
+#version 150
+#define float2 vec2
+#define float3 vec3
+#define float4 vec4
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+uniform Push
+{
+   vec4 SourceSize;
+   vec4 OutputSize;
+   float REVERSEAA_SHARPNESS;
+}params;
+
+#pragma parameterREVERSEAA_SHARPNESS¡2.00.010.00.01
+
+layout(std140) uniform UBO
+{
+   mat4 MVP;
+}global;
+
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 FragColor;
+uniform sampler2D Source;
+
+
+
+vec3 res2x(vec3 pre2, vec3 pre1, vec3 px, vec3 pos1, vec3 pos2)
+{
+    vec3 t, m;
+    mat4x3 pre = mat4x3(pre2, pre1, px, pos1);
+    mat4x3 pos = mat4x3(pre1, px, pos1, pos2);
+    mat4x3 df = pos - pre;
+
+    m = 0.5 - abs(px - 0.5);
+    m = params . REVERSEAA_SHARPNESS * min(m, min(abs(df[1]), abs(df[2])));
+    t =(7 *(df[1]+ df[2])- 3 *(df[0]+ df[3]))/ 16;
+    t = clamp(t, - m, m);
+
+    return t;
+}
+
+void main()
+{
+   vec2 pos = fract(vTexCoord * params . SourceSize . xy)- vec2(0.5, 0.5);
+   vec2 coord = vTexCoord - pos * params . SourceSize . zw;
+
+   vec3 E = texture(Source, coord + params . SourceSize . zw * vec2(0, 0)). rgb;
+   vec3 _tx = res2x(texture(Source, coord + params . SourceSize . zw * vec2(- 2, 0)). rgb, texture(Source, coord + params . SourceSize . zw * vec2(- 1, 0)). rgb, E, texture(Source, coord + params . SourceSize . zw * vec2(1, 0)). rgb, texture(Source, coord + params . SourceSize . zw * vec2(2, 0)). rgb)* pos . x;
+   vec3 _ty = res2x(texture(Source, coord + params . SourceSize . zw * vec2(0, - 2)). rgb, texture(Source, coord + params . SourceSize . zw * vec2(0, - 1)). rgb, E, texture(Source, coord + params . SourceSize . zw * vec2(0, 1)). rgb, texture(Source, coord + params . SourceSize . zw * vec2(0, 2)). rgb)* pos . y;
+   vec3 res = clamp(E + 2.0 *(_tx + _ty), 0.0, 1.0);
+
+   FragColor = vec4(res, 1.0);
+}

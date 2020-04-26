@@ -1,0 +1,98 @@
+#version 150
+#define float2 vec2
+#define float3 vec3
+#define float4 vec4
+
+
+
+
+
+
+
+
+
+uniform Push
+{
+   vec4 SourceSize;
+   vec4 OriginalSize;
+   vec4 OutputSize;
+   uint FrameCount;
+   float VL_LO;
+   float VL_HI;
+   float CB_LO;
+   float CB_HI;
+}params;
+
+#pragma parameterVL_LO¡1.250.010.00.05
+#pragma parameterVL_HI¡1.750.010.00.05
+#pragma parameterCB_LO¡5.250.025.00.05
+#pragma parameterCB_HI¡5.750.025.00.05
+
+layout(std140) uniform UBO
+{
+   mat4 MVP;
+}global;
+
+
+
+
+
+vec2 sigmoid(vec2 signal){
+ return smoothstep(vec2(params . VL_LO, params . CB_LO), vec2(params . VL_HI, params . CB_HI), signal);
+}
+
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 FragColor;
+uniform sampler2D Source;
+
+void main()
+{
+
+
+
+
+
+
+
+
+ vec2 C = texture(Source, vTexCoord + vec2((0.),(0.))* params . SourceSize . zw). xy;
+
+
+ vec2 hits = vec2(0.0);
+
+
+ vec2 L1 = texture(Source, vTexCoord + vec2((- 1.),(0.))* params . SourceSize . zw). xy;
+ vec2 R1 = texture(Source, vTexCoord + vec2((1.),(0.))* params . SourceSize . zw). xy;
+ vec2 U1 = texture(Source, vTexCoord + vec2((0.),(- 1.))* params . SourceSize . zw). xy;
+ vec2 D1 = texture(Source, vTexCoord + vec2((0.),(1.))* params . SourceSize . zw). xy;
+
+
+ vec2 L2 = min(texture(Source, vTexCoord + vec2((- 2.),(0.))* params . SourceSize . zw). xy, L1);
+ vec2 R2 = min(texture(Source, vTexCoord + vec2((2.),(0.))* params . SourceSize . zw). xy, R1);
+ vec2 U2 = min(texture(Source, vTexCoord + vec2((0.),(- 2.))* params . SourceSize . zw). xy, U1);
+ vec2 D2 = min(texture(Source, vTexCoord + vec2((0.),(2.))* params . SourceSize . zw). xy, D1);
+ vec2 UL = min(texture(Source, vTexCoord + vec2((- 1.),(- 1.))* params . SourceSize . zw). xy, max(L1, U1));
+ vec2 UR = min(texture(Source, vTexCoord + vec2((1.),(- 1.))* params . SourceSize . zw). xy, max(R1, U1));
+ vec2 DL = min(texture(Source, vTexCoord + vec2((- 1.),(1.))* params . SourceSize . zw). xy, max(L1, D1));
+ vec2 DR = min(texture(Source, vTexCoord + vec2((1.),(1.))* params . SourceSize . zw). xy, max(R1, D1));
+
+
+ vec2 ULL = min(texture(Source, vTexCoord + vec2((- 2.),(- 1.))* params . SourceSize . zw). xy, max(L2, UL));
+ vec2 URR = min(texture(Source, vTexCoord + vec2((2.),(- 1.))* params . SourceSize . zw). xy, max(R2, UR));
+ vec2 DRR = min(texture(Source, vTexCoord + vec2((2.),(1.))* params . SourceSize . zw). xy, max(R2, DR));
+ vec2 DLL = min(texture(Source, vTexCoord + vec2((- 2.),(1.))* params . SourceSize . zw). xy, max(L2, DL));
+ vec2 UUL = min(texture(Source, vTexCoord + vec2((- 1.),(- 2.))* params . SourceSize . zw). xy, max(U2, UL));
+ vec2 UUR = min(texture(Source, vTexCoord + vec2((1.),(- 2.))* params . SourceSize . zw). xy, max(U2, UR));
+ vec2 DDR = min(texture(Source, vTexCoord + vec2((1.),(2.))* params . SourceSize . zw). xy, max(D2, DR));
+ vec2 DDL = min(texture(Source, vTexCoord + vec2((- 1.),(2.))* params . SourceSize . zw). xy, max(D2, DL));
+
+
+ hits += min(texture(Source, vTexCoord + vec2((- 2.),(- 2.))* params . SourceSize . zw). xy, max(UUL, ULL));
+ hits += min(texture(Source, vTexCoord + vec2((2.),(- 2.))* params . SourceSize . zw). xy, max(UUR, URR));
+ hits += min(texture(Source, vTexCoord + vec2((- 2.),(2.))* params . SourceSize . zw). xy, max(DDL, DLL));
+ hits += min(texture(Source, vTexCoord + vec2((2.),(2.))* params . SourceSize . zw). xy, max(DDR, DRR));
+
+ hits +=(ULL + URR + DRR + DLL + L2 + R2)+ vec2(0.0, 1.0)*(C + U1 + U2 + D1 + D2 + L1 + R1 + UL + UR + DL + DR + UUL + UUR + DDR + DDL);
+
+   FragColor = vec4(C * sigmoid(hits), C);
+}

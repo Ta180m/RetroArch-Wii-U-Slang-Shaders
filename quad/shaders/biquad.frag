@@ -1,0 +1,124 @@
+#version 150
+#define float2 vec2
+#define float3 vec3
+#define float4 vec4
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+uniform Push
+{
+   vec4 SourceSize;
+   vec4 OriginalSize;
+   vec4 OutputSize;
+   uint FrameCount;
+   float K;
+}params;
+
+
+#pragma parameterK¡0.80.01.00.01
+
+
+
+layout(std140) uniform UBO
+{
+   mat4 MVP;
+}global;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+float d(vec2 pt1, vec2 pt2)
+{
+       vec2 v = pt2 - pt1;
+  return sqrt(dot(v, v));
+}
+
+     vec3 resampler(vec3 x)
+    {
+           vec3 res;
+
+      res = lessThanEqual(x, vec3(0.5, 0.5, 0.5))== bvec3(true)?(- 2 * params . K * x * x + 0.5 *(params . K + 1)):(lessThanEqual(x, vec3(1.5, 1.5, 1.5))== bvec3(true)?(params . K * x * x +(- 2 * params . K - 0.5)* x + 0.75 *(params . K + 1)): vec3(0.00001, 0.00001, 0.00001));
+
+      return res;
+    }
+
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 FragColor;
+uniform sampler2D Source;
+
+void main()
+{
+           vec3 color;
+             mat3x3 weights;
+
+           vec2 dx = vec2(1.0, 0.0);
+           vec2 dy = vec2(0.0, 1.0);
+
+           vec2 pc = vTexCoord * params . SourceSize . xy;
+
+           vec2 tc =(floor(pc)+ vec2(0.5, 0.5));
+
+      weights[0]= resampler(vec3(d(pc, tc - dx - dy), d(pc, tc - dy), d(pc, tc + dx - dy)));
+      weights[1]= resampler(vec3(d(pc, tc - dx), d(pc, tc), d(pc, tc + dx)));
+      weights[2]= resampler(vec3(d(pc, tc - dx + dy), d(pc, tc + dy), d(pc, tc + dx + dy)));
+
+      dx = dx * params . SourceSize . zw;
+      dy = dy * params . SourceSize . zw;
+      tc = tc * params . SourceSize . zw;
+
+
+           vec3 c00 = texture(Source, tc - dx - dy). xyz;
+           vec3 c10 = texture(Source, tc - dy). xyz;
+           vec3 c20 = texture(Source, tc + dx - dy). xyz;
+           vec3 c01 = texture(Source, tc - dx). xyz;
+           vec3 c11 = texture(Source, tc). xyz;
+           vec3 c21 = texture(Source, tc + dx). xyz;
+           vec3 c02 = texture(Source, tc - dx + dy). xyz;
+           vec3 c12 = texture(Source, tc + dy). xyz;
+           vec3 c22 = texture(Source, tc + dx + dy). xyz;
+
+      color =(mat3x3(c00, c10, c20)* weights[0]);
+      color +=(mat3x3(c01, c11, c21)* weights[1]);
+      color +=(mat3x3(c02, c12, c22)* weights[2]);
+      color = color /(dot((vec3(1.0)* weights), vec3(1.0)));
+
+
+   FragColor = vec4(color, 1.0);
+}

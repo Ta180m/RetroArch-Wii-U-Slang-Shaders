@@ -1,0 +1,113 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+#line 1 "../../../slang-shaders/ntsc/shaders/ntsc-pass1-composite-3phase.slang"
+
+
+layout(std140, set = 0, binding = 0)uniform UBO
+{
+   mat4 MVP;
+   vec4 OutputSize;
+   vec4 OriginalSize;
+   vec4 SourceSize;
+   uint FrameCount;
+} global;
+
+
+
+#line 1 "../../../slang-shaders/ntsc/shaders/ntsc-param.inc"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+mat3 mix_mat = mat3(
+          1.0, 1.0, 1.0,
+           1.0, 2.0 * 1.0, 0.0,
+           1.0, 0.0, 2.0 * 1.0
+);
+
+
+#line 15 "../../../slang-shaders/ntsc/shaders/ntsc-pass1-composite-3phase.slang"
+#line 1 "../../../slang-shaders/ntsc/shaders/ntsc-rgbyuv.inc"
+const mat3 yiq2rgb_mat = mat3(
+   1.0, 0.956, 0.6210,
+   1.0, - 0.2720, - 0.6474,
+   1.0, - 1.1060, 1.7046);
+
+vec3 yiq2rgb(vec3 yiq)
+{
+   return yiq * yiq2rgb_mat;
+}
+
+const mat3 yiq_mat = mat3(
+      0.2989, 0.5870, 0.1140,
+      0.5959, - 0.2744, - 0.3216,
+      0.2115, - 0.5229, 0.3114
+);
+
+vec3 rgb2yiq(vec3 col)
+{
+   return col * yiq_mat;
+}
+#line 16 "../../../slang-shaders/ntsc/shaders/ntsc-pass1-composite-3phase.slang"
+#line 1 "../../../slang-shaders/ntsc/shaders/ntsc-pass1-vertex.inc"
+#pragma stagevertex
+layout(location = 0)in vec4 Position;
+layout(location = 1)in vec2 TexCoord;
+layout(location = 0)out vec2 vTexCoord;
+layout(location = 1)out vec2 pix_no;
+
+void main()
+{
+   gl_Position = global . MVP * Position;
+   vTexCoord = TexCoord;
+   pix_no = TexCoord * global . SourceSize . xy *(global . OutputSize . xy / global . SourceSize . xy);
+}
+#line 17 "../../../slang-shaders/ntsc/shaders/ntsc-pass1-composite-3phase.slang"
+
+#pragma stagefragment
+layout(location = 0)in vec2 vTexCoord;
+layout(location = 1)in vec2 pix_no;
+layout(location = 0)out vec4 FragColor;
+layout(set = 0, binding = 2)uniform sampler2D Source;
+
+void main()
+{
+#line 1 "../../../slang-shaders/ntsc/shaders/ntsc-pass1-encode-demodulate.inc"
+ vec3 col = texture(Source, vTexCoord). rgb;
+vec3 yiq = rgb2yiq(col);
+
+
+
+
+float chroma_phase = 0.6667 * 3.14159265 *(mod(pix_no . y, 3.0)+ global . FrameCount);
+
+
+float mod_phase = chroma_phase + pix_no . x *(3.14159265 / 3.0);
+
+float i_mod = cos(mod_phase);
+float q_mod = sin(mod_phase);
+
+yiq . yz *= vec2(i_mod, q_mod);
+yiq *= mix_mat;
+yiq . yz *= vec2(i_mod, q_mod);
+FragColor = vec4(yiq, 1.0);
+
+#line 27 "../../../slang-shaders/ntsc/shaders/ntsc-pass1-composite-3phase.slang"
+}

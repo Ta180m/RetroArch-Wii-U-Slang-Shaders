@@ -1,0 +1,95 @@
+#version 150
+#define float2 vec2
+#define float3 vec3
+#define float4 vec4
+
+
+
+
+uniform Push
+{
+   vec4 SourceSize;
+   vec4 OriginalSize;
+   vec4 OutputSize;
+   uint FrameCount;
+   float BrightenLevel;
+   float BrightenAmount;
+   float ContrastAmount;
+   float ChromaLevel;
+   float IAmount;
+   float QAmount;
+   float ITilt;
+   float QTilt;
+   float ITiltHigh;
+   float QTiltHigh;
+   float ITiltMid;
+   float QTiltMid;
+   float ITiltLow;
+   float QTiltLow;
+   float LumBoost;
+}params;
+
+#pragma parameterBrightenLevel¡2.01.010.01.0
+#pragma parameterBrightenAmount¡0.00.01.00.1
+#pragma parameterContrastAmount¡0.00.01.00.1
+#pragma parameterChromaLevel¡2.01.010.01.0
+#pragma parameterIAmount¡0.00.01.00.1
+#pragma parameterQAmount¡0.00.01.00.1
+#pragma parameterITilt¡0.50.40.60.01
+#pragma parameterQTilt¡0.50.40.60.01
+#pragma parameterITiltHigh¡0.50.40.60.01
+#pragma parameterQTiltHigh¡0.50.40.60.01
+#pragma parameterITiltMid¡0.50.40.60.01
+#pragma parameterQTiltMid¡0.50.40.60.01
+#pragma parameterITiltLow¡0.50.40.60.01
+#pragma parameterQTiltLow¡0.50.40.60.01
+#pragma parameterLumBoost¡0.00.01.00.1
+
+layout(std140) uniform UBO
+{
+   mat4 MVP;
+}global;
+
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 FragColor;
+uniform sampler2D Source;
+
+
+
+
+vec3 Chroma(vec3 Photo, float Level){
+    Photo *= mat3x3(0.299, 0.595716, 0.211456, 0.587, - 0.274453, - 0.522591, 0.114, - 0.321263, 0.311135);
+    float I_Tilt =((params . ITilt - 0.5)* 2);
+    float Q_Tilt =((params . QTilt - 0.5)* 2);
+    float LumHigh = max(Photo . x - 0.5, 0.0)* 2.0;
+    float LumMid = 1 - abs(Photo . x - 0.5)* 2.0;
+    float LumLow = max((1 - Photo . x)- 0.5, 0.0)* 2.0;
+    float I_TiltHigh =((params . ITiltHigh - 0.5)* 2)* LumHigh;
+    float Q_TiltHigh =((params . QTiltHigh - 0.5)* 2)* LumHigh;
+    float I_TiltMid =((params . ITiltMid - 0.5)* 2)* LumMid;
+    float Q_TiltMid =((params . QTiltMid - 0.5)* 2)* LumMid;
+    float I_TiltLow =((params . ITiltLow - 0.5)* 2)* LumLow;
+    float Q_TiltLow =((params . QTiltLow - 0.5)* 2)* LumLow;
+    Photo . yz = mix(Photo . yz,(1.0 - pow(1.0 - abs(Photo . yz), vec2(Level)))* sign(Photo . yz), vec2(params . IAmount, params . QAmount));
+    Photo . y = Photo . y *(1 - abs(I_Tilt))+ I_Tilt;
+    Photo . z = Photo . z *(1 - abs(Q_Tilt))+ Q_Tilt;
+    Photo . y = Photo . y *(1 - abs(I_TiltHigh))+ I_TiltHigh;
+    Photo . z = Photo . z *(1 - abs(Q_TiltHigh))+ Q_TiltHigh;
+    Photo . y = Photo . y *(1 - abs(I_TiltMid))+ I_TiltMid;
+    Photo . z = Photo . z *(1 - abs(Q_TiltMid))+ Q_TiltMid;
+    Photo . y = Photo . y *(1 - abs(I_TiltLow))+ I_TiltLow;
+    Photo . z = Photo . z *(1 - abs(Q_TiltLow))+ Q_TiltLow;
+    Photo . x = mix(Photo . x, 1 - pow(1 - Photo . x, 2.0), params . LumBoost);
+    Photo *= mat3x3(1.0, 1.0, 1.0, 0.9563, - 0.2721, - 1.1070, 0.6210, - 0.6474, 1.7046);
+    Photo = clamp(Photo, 0.0, 1.0);
+    Photo = mix(Photo, 1.0 - pow(1.0 - Photo, vec3(params . BrightenLevel)), params . BrightenAmount);
+    Photo = mix(Photo, Photo * Photo *(3 - 2 * Photo), params . ContrastAmount);
+    return Photo;
+}
+
+void main()
+{
+    vec3 Picture = texture(Source, vTexCoord). xyz;
+
+    FragColor = vec4(Chroma(Picture, params . ChromaLevel), 1.0);
+}

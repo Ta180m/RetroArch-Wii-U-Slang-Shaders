@@ -1,0 +1,161 @@
+#version 450
+
+
+
+
+
+
+layout(push_constant)uniform Push
+{
+ vec4 SourceSize;
+ vec4 OriginalSize;
+ vec4 OutputSize;
+ uint FrameCount;
+ float GaussStrength;
+ float BloomStrength;
+ float SW;
+ float BRIGHT;
+} params;
+
+
+
+
+
+#pragma parameterGaussStrength¡0.300.01.00.01
+
+#pragma parameterBloomStrength¡0.330.0001.0000.005
+
+#pragma parameterSW¡2.01.04.00.25
+
+#pragma parameterBRIGHT¡0.50.30.60.01
+
+
+layout(std140, set = 0, binding = 0)uniform UBO
+{
+ mat4 MVP;
+} global;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#pragma stagevertex
+layout(location = 0)in vec4 Position;
+layout(location = 1)in vec2 TexCoord;
+layout(location = 0)out vec2 vTexCoord;
+
+void main()
+{
+   gl_Position = global . MVP * Position;
+   vTexCoord = TexCoord;
+}
+
+#pragma stagefragment
+layout(location = 0)in vec2 vTexCoord;
+layout(location = 0)out vec4 FragColor;
+layout(set = 0, binding = 2)uniform sampler2D Source;
+layout(set = 0, binding = 3)uniform sampler2D scanpass;
+
+void main()
+{
+ vec2 texp = vTexCoord;
+ vec2 texcoord = vTexCoord;
+ vec2 PIXEL_SIZE = params . SourceSize . zw;
+
+ float sampleOffsets[5]= { 0.0, 1.4347826, 3.3478260, 5.2608695, 7.1739130 };
+ float sampleWeights[5]= { 0.16818994, 0.27276957, 0.11690125, 0.024067905, 0.0021112196 };
+
+ vec4 color = texture(Source, texcoord)* sampleWeights[0];
+ for(int i = 1;i < 5;++ i){
+  color += texture(Source, texcoord + vec2(sampleOffsets[i]* params . SW * PIXEL_SIZE . x, sampleOffsets[i]* PIXEL_SIZE . y))* sampleWeights[i];
+  color += texture(Source, texcoord - vec2(sampleOffsets[i]* params . SW * PIXEL_SIZE . x, sampleOffsets[i]* PIXEL_SIZE . y))* sampleWeights[i];
+  color += texture(Source, texcoord + vec2(- sampleOffsets[i]* params . SW * PIXEL_SIZE . x, sampleOffsets[i]* PIXEL_SIZE . y))* sampleWeights[i];
+  color += texture(Source, texcoord + vec2(sampleOffsets[i]* params . SW * PIXEL_SIZE . x, - sampleOffsets[i]* PIXEL_SIZE . y))* sampleWeights[i];
+ }
+ vec4 blur = params . BRIGHT * color;
+
+ vec4 orig = texture(scanpass, texp);
+
+ vec3 sharp;
+
+
+
+
+  orig = mix(orig, blur, params . GaussStrength);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   orig += mix(orig, blur * 4, params . BloomStrength);
+   orig = orig * 0.5;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   FragColor = orig;
+}

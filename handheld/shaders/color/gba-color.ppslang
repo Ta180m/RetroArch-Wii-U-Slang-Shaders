@@ -1,0 +1,82 @@
+#version 450
+
+layout(push_constant)uniform Push
+{
+   float darken_screen;
+} params;
+
+layout(std140, set = 0, binding = 0)uniform UBO
+{
+   mat4 MVP;
+   vec4 OutputSize;
+   vec4 OriginalSize;
+   vec4 SourceSize;
+} global;
+
+
+
+
+
+
+
+
+
+#pragma parameterdarken_screen¡0.5-0.252.00.05
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#pragma stagevertex
+layout(location = 0)in vec4 Position;
+layout(location = 1)in vec2 TexCoord;
+layout(location = 0)out vec2 vTexCoord;
+
+void main()
+{
+   gl_Position = global . MVP * Position;
+   vTexCoord = TexCoord;
+}
+
+#pragma stagefragment
+layout(location = 0)in vec2 vTexCoord;
+layout(location = 0)out vec4 FragColor;
+layout(set = 0, binding = 2)uniform sampler2D Source;
+
+void main()
+{
+   vec4 screen = pow(texture(Source, vTexCoord), vec4(2.2 + params . darken_screen)). rgba;
+   vec4 avglum = vec4(0.5);
+   screen = mix(screen, avglum,(1.0 - 1.0));
+
+
+mat4 color = mat4(0.845, 0.09, 0.16, 0.0,
+       0.17, 0.68, 0.085, 0.0,
+       - 0.015, 0.23, 0.755, 0.0,
+       0.0, 0.0, 0.0, 0.0);
+
+mat4 adjust = mat4((1.0 - 1.0)* 0.3086 + 1.0,(1.0 - 1.0)* 0.3086,(1.0 - 1.0)* 0.3086, 1.0,
+(1.0 - 1.0)* 0.6094,(1.0 - 1.0)* 0.6094 + 1.0,(1.0 - 1.0)* 0.6094, 1.0,
+(1.0 - 1.0)* 0.0820,(1.0 - 1.0)* 0.0820,(1.0 - 1.0)* 0.0820 + 1.0, 1.0,
+0.0, 0.0, 0.0, 1.0);
+ color *= adjust;
+ screen = clamp(screen * 1.0, 0.0, 1.0);
+ screen = color * screen;
+ FragColor = pow(screen, vec4(1.0 /(2.2)));
+}

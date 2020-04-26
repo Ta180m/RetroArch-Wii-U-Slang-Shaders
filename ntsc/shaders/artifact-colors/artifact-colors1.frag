@@ -1,0 +1,143 @@
+#version 150
+#define float2 vec2
+#define float3 vec3
+#define float4 vec4
+
+
+
+
+
+
+
+
+uniform Push
+{
+   vec4 SourceSize;
+   vec4 OriginalSize;
+   vec4 OutputSize;
+   uint FrameCount;
+   float FIR_SIZE;
+   float F_COL;
+   float F_LUMA_LP;
+   float F_COL_BW;
+}params;
+
+#pragma parameterFIR_SIZE¡29.01.050.01.0
+#pragma parameterF_COL¡0.250.250.50.25
+#pragma parameterF_LUMA_LP¡0.166670.00010.3333330.02
+#pragma parameterF_COL_BW¡50.010.0200.01.0
+
+layout(std140) uniform UBO
+{
+   mat4 MVP;
+}global;
+
+#pragma formatR16G16B16A16_SFLOAT
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 FragColor;
+uniform sampler2D Source;
+
+
+
+
+
+
+
+
+
+
+float pi = 3.141592654;
+float tau = 6.283185308;
+
+
+vec4 sample2D(sampler2D tex, vec2 resolution, vec2 uv)
+{
+    return texture(tex, uv / resolution);
+}
+
+
+vec2 cmul(vec2 a, vec2 b)
+{
+   return vec2((a . x * b . x)-(a . y * b . y),(a . x * b . y)+(a . y * b . x));
+}
+
+float sinc(float x)
+{
+ return(x == 0.0)? 1.0 : sin(x * pi)/(x * pi);
+}
+
+
+float WindowBlackman(float a, int N, int i)
+{
+    float a0 =(1.0 - a)/ 2.0;
+    float a1 = 0.5;
+    float a2 = a / 2.0;
+
+    float wnd = a0;
+    wnd -= a1 * cos(2.0 * pi *(float(i)/ float(N - 1)));
+    wnd += a2 * cos(4.0 * pi *(float(i)/ float(N - 1)));
+
+    return wnd;
+}
+
+
+
+float Lowpass(float Fc, float Fs, int N, int i)
+{
+    float wc =(Fc / Fs);
+
+    float wnd = WindowBlackman(0.16, N, i);
+
+    return 2.0 * wc * wnd * sinc(2.0 * wc * float(i - N / 2));
+}
+
+
+
+float Bandpass(float Fa, float Fb, float Fs, int N, int i)
+{
+    float wa =(Fa / Fs);
+    float wb =(Fb / Fs);
+
+    float wnd = WindowBlackman(0.16, N, i);
+
+    return 2.0 *(wb - wa)* wnd *(sinc(2.0 * wb * float(i - N / 2))- sinc(2.0 * wa * float(i - N / 2)));
+}
+
+
+vec2 Oscillator(float Fo, float Fs, float N)
+{
+    float phase =(tau * Fo * floor(N))/ Fs;
+    return vec2(cos(phase), sin(phase));
+}
+
+void main()
+{
+    float Fs = params . SourceSize . x;
+    float Fcol = Fs * params . F_COL;
+    float Fcolbw = Fs *(1.0 / params . F_COL_BW);
+    float Flumlp = Fs * params . F_LUMA_LP;
+    float n = floor(vTexCoord . x * params . OutputSize . x);
+
+    float y_sig = 0.0;
+    float iq_sig = 0.0;
+
+    vec2 cOsc = Oscillator(Fcol, Fs, n);
+
+    n += float(params . FIR_SIZE)/ 2.0;
+
+
+    for(int i = 0;i < params . FIR_SIZE;i ++)
+    {
+        int tpidx = int(params . FIR_SIZE)- i - 1;
+        float lp = Lowpass(Flumlp, Fs, int(params . FIR_SIZE), tpidx);
+        float bp = Bandpass(Fcol - Fcolbw, Fcol + Fcolbw, Fs, int(params . FIR_SIZE), tpidx);
+
+        y_sig += sample2D(Source, params . SourceSize . xy, vec2(n - float(i),(vTexCoord . y * params . OutputSize . y))). r * lp;
+        iq_sig += sample2D(Source, params . SourceSize . xy, vec2(n - float(i),(vTexCoord . y * params . OutputSize . y))). r * bp;
+    }
+
+
+    vec2 iq_sig_mix = cmul(vec2(iq_sig, 0.), cOsc);
+
+   FragColor = vec4(y_sig, iq_sig_mix, 0.);
+}

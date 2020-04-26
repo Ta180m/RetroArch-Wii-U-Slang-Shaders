@@ -1,0 +1,628 @@
+#version 150
+#define float2 vec2
+#define float3 vec3
+#define float4 vec4
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+uniform Push
+{
+   vec4 SourceSize;
+   vec4 OriginalSize;
+   vec4 OutputSize;
+   uint FrameCount;
+   float MASK;
+   float MASK_INTENSITY;
+   float SCANLINE_THINNESS;
+   float SCAN_BLUR;
+   float CURVATURE;
+   float TRINITRON_CURVE;
+   float CORNER;
+   float CRT_GAMMA;
+}params;
+
+#pragma parameterMASK¡1.00.03.01.0
+#pragma parameterMASK_INTENSITY¡0.50.01.00.05
+#pragma parameterSCANLINE_THINNESS¡0.50.01.00.1
+#pragma parameterSCAN_BLUR¡2.51.03.00.1
+#pragma parameterCURVATURE¡0.020.00.250.01
+#pragma parameterTRINITRON_CURVE¡0.00.01.01.0
+#pragma parameterCORNER¡3.00.011.01.0
+#pragma parameterCRT_GAMMA¡2.40.051.00.1
+
+layout(std140) uniform UBO
+{
+   mat4 MVP;
+}global;
+
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 FragColor;
+uniform sampler2D Source;
+
+
+
+
+
+
+
+
+
+
+
+ float FromSrgb1(float c){
+  return(c <= 0.04045)? c *(1.0 / 12.92):
+   pow(abs(c)*(1.0 / 1.055)+(0.055 / 1.055), params . CRT_GAMMA);}
+
+vec3 FromSrgb(vec3 c){ return vec3(
+ FromSrgb1(c . r), FromSrgb1(c . g), FromSrgb1(c . b));}
+
+
+
+float ToSrgb1(float c){
+ return(c < 0.0031308 ? c * 12.92 : 1.055 * pow(c, 0.41666)- 0.055);}
+
+vec3 ToSrgb(vec3 c){ return vec3(
+ ToSrgb1(c . r), ToSrgb1(c . g), ToSrgb1(c . b));}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+vec3 CrtsFetch(vec2 uv){
+
+ uv *= vec2(params . SourceSize . x, params . SourceSize . y)/ params . SourceSize . xy;
+
+
+
+ return FromSrgb(texture(Source, uv . xy, - 16.0). rgb);}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       float CrtsMax3F1(float a, float b, float c){
+   return max(a, max(b, c));}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      vec4 CrtsTone(
+      float contrast,
+      float saturation,
+      float thin,
+      float mask){
+
+  if(params . MASK == 0.0)mask = 1.0;
+
+  if(params . MASK == 1.0){
+
+
+   mask = 0.5 + mask * 0.5;
+   }
+
+       vec4 ret;
+       float midOut = 0.18 /((1.5 - thin)*(0.5 * mask + 0.5));
+       float pMidIn = pow(0.18, contrast);
+  ret . x = contrast;
+  ret . y =((- pMidIn)+ midOut)/((1.0 - pMidIn)* midOut);
+  ret . z =((- pMidIn)* midOut + pMidIn)/(midOut *(- pMidIn)+ midOut);
+  ret . w = contrast + saturation;
+  return ret;}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      vec3 CrtsMask(vec2 pos, float dark){
+  if(params . MASK == 2.0){
+        vec3 m = vec3(dark, dark, dark);
+        float x = fract(pos . x *(1.0 / 3.0));
+   if(x <(1.0 / 3.0))m . r = 1.0;
+   else if(x <(2.0 / 3.0))m . g = 1.0;
+   else m . b = 1.0;
+   return m;
+  }
+
+  else if(params . MASK == 1.0){
+        vec3 m = vec3(1.0, 1.0, 1.0);
+        float x = fract(pos . x *(1.0 / 3.0));
+   if(x <(1.0 / 3.0))m . r = dark;
+   else if(x <(2.0 / 3.0))m . g = dark;
+   else m . b = dark;
+   return m;
+  }
+
+  else if(params . MASK == 3.0){
+   pos . x += pos . y * 2.9999;
+        vec3 m = vec3(dark, dark, dark);
+        float x = fract(pos . x *(1.0 / 6.0));
+   if(x <(1.0 / 3.0))m . r = 1.0;
+   else if(x <(2.0 / 3.0))m . g = 1.0;
+   else m . b = 1.0;
+   return m;
+  }
+
+  else {
+   return vec3(1.0, 1.0, 1.0);
+  }
+ }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      vec3 CrtsFilter(
+
+
+       vec2 ipos,
+
+
+       vec2 inputSizeDivOutputSize,
+
+
+       vec2 halfInputSize,
+
+
+       vec2 rcpInputSize,
+
+
+       vec2 rcpOutputSize,
+
+
+       vec2 twoDivOutputSize,
+
+
+       float inputHeight,
+
+
+
+
+
+
+       vec2 warp,
+
+
+
+
+
+
+       float thin,
+
+
+
+
+
+
+       float blur,
+
+
+
+
+
+
+       float mask,
+
+
+       vec4 tone
+
+ ){
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       vec2 pos;
+
+
+   pos = ipos * twoDivOutputSize - vec2(1.0, 1.0);
+
+   pos *= vec2(
+    1.0 +(pos . y * pos . y)* warp . x,
+    1.0 +(pos . x * pos . x)* warp . y);
+
+        float vin =(1.0 -(
+    (1.0 - clamp((pos . x * pos . x), 0.0, 1.0))*(1.0 - clamp((pos . y * pos . y), 0.0, 1.0))))*(0.998 +(0.001 * params . CORNER));
+   vin = clamp(((- vin)* inputHeight + inputHeight), 0.0, 1.0);
+
+   pos = pos * halfInputSize + halfInputSize;
+
+
+
+
+
+       float y0 = floor(pos . y - 0.5)+ 0.5;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        float x0 = floor(pos . x - 1.5)+ 0.5;
+
+        vec2 p = vec2(x0 * rcpInputSize . x, y0 * rcpInputSize . y);
+
+        vec3 colA0 = CrtsFetch(p);
+   p . x += rcpInputSize . x;
+        vec3 colA1 = CrtsFetch(p);
+   p . x += rcpInputSize . x;
+        vec3 colA2 = CrtsFetch(p);
+   p . x += rcpInputSize . x;
+        vec3 colA3 = CrtsFetch(p);
+   p . y += rcpInputSize . y;
+        vec3 colB3 = CrtsFetch(p);
+   p . x -= rcpInputSize . x;
+        vec3 colB2 = CrtsFetch(p);
+   p . x -= rcpInputSize . x;
+        vec3 colB1 = CrtsFetch(p);
+   p . x -= rcpInputSize . x;
+        vec3 colB0 = CrtsFetch(p);
+
+
+
+
+
+       float off = pos . y - y0;
+       float pi2 = 6.28318530717958;
+       float hlf = 0.5;
+       float scanA = cos(min(0.5, off * thin)* pi2)* hlf + hlf;
+       float scanB = cos(min(0.5,(- off)* thin + thin)* pi2)* hlf + hlf;
+
+
+
+
+
+
+
+
+
+
+
+        float off0 = pos . x - x0;
+        float off1 = off0 - 1.0;
+        float off2 = off0 - 2.0;
+        float off3 = off0 - 3.0;
+        float pix0 = exp2(blur * off0 * off0);
+        float pix1 = exp2(blur * off1 * off1);
+        float pix2 = exp2(blur * off2 * off2);
+        float pix3 = exp2(blur * off3 * off3);
+        float pixT =(1.0 /(pix0 + pix1 + pix2 + pix3));
+
+
+    pixT *= vin;
+
+   scanA *= pixT;
+   scanB *= pixT;
+
+        vec3 color =
+    (colA0 * pix0 + colA1 * pix1 + colA2 * pix2 + colA3 * pix3)* scanA +
+    (colB0 * pix0 + colB1 * pix1 + colB2 * pix2 + colB3 * pix3)* scanB;
+
+
+
+  color *= CrtsMask(ipos, mask);
+
+
+
+
+        float peak = max(1.0 /(256.0 * 65536.0),
+    CrtsMax3F1(color . r, color . g, color . b));
+
+        vec3 ratio = color *(1.0 /(peak));
+
+
+    peak = pow(peak, tone . x);
+
+   peak = peak *(1.0 /(peak * tone . y + tone . z));
+
+
+    ratio = pow(ratio, vec3(tone . w, tone . w, tone . w));
+
+
+   return ratio * peak;
+
+
+
+
+ }
+
+
+void main()
+{
+ vec2 warp_factor;
+ warp_factor . x = params . CURVATURE;
+ warp_factor . y =(3.0 / 4.0)* warp_factor . x;
+ warp_factor . x *=(1.0 - params . TRINITRON_CURVE);
+ FragColor . rgb = CrtsFilter(vTexCoord . xy * params . OutputSize . xy,
+ params . SourceSize . xy * params . OutputSize . zw,
+ params . SourceSize . xy * vec2(0.5, 0.5),
+ params . SourceSize . zw,
+ params . OutputSize . zw,
+ 2.0 * params . OutputSize . zw,
+ params . SourceSize . y,
+ warp_factor,
+          (0.5 +(0.5 * params . SCANLINE_THINNESS)),
+          (- 1.0 * params . SCAN_BLUR),
+          (1.0 - params . MASK_INTENSITY),
+ CrtsTone(1.0, 0.0,(0.5 +(0.5 * params . SCANLINE_THINNESS)),(1.0 - params . MASK_INTENSITY)));
+
+
+ FragColor . rgb = ToSrgb(FragColor . rgb);
+}

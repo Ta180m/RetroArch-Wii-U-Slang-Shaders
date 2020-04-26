@@ -1,0 +1,103 @@
+#version 150
+#define float2 vec2
+#define float3 vec3
+#define float4 vec4
+
+
+uniform Push
+{
+   vec4 OutputSize;
+   vec4 OriginalSize;
+   vec4 SourceSize;
+   float noScanlines;
+   float tvVerticalResolution;
+   float blackLevel;
+   float contrast;
+   float compositeConnection;
+}params;
+
+#pragma parameternoScanlines¡0.00.01.01.0
+#pragma parametertvVerticalResolution¡250.020.01000.010.0
+#pragma parameterblackLevel¡0.07-0.300.300.01
+#pragma parametercontrast¡1.00.02.00.1
+
+layout(std140) uniform UBO
+{
+   mat4 MVP;
+}global;
+
+
+
+
+
+
+
+#pragma parametercompositeConnection¡0.00.01.01.0
+
+
+
+
+
+
+float normalGaussIntegral(float x)
+{
+   float a1 = 0.4361836;
+   float a2 = - 0.1201676;
+   float a3 = 0.9372980;
+   float p = 0.3326700;
+   float t = 1.0 /(1.0 + p * abs(x));
+   return(0.5 -((exp(-(x)*(x)* 0.5))/ sqrt(2.0 * 3.14159265358))*(t *(a1 + t *(a2 + a3 * t))))* sign(x);
+}
+
+vec3 scanlines(float x, vec3 c){
+   float temp = sqrt(2 * 3.14159265358)*(params . tvVerticalResolution * params . SourceSize . w);
+
+   float rrr = 0.5 *(params . SourceSize . y * params . OutputSize . w);
+   float x1 =(x + rrr)* temp;
+   float x2 =(x - rrr)* temp;
+   c . r =(c . r *(normalGaussIntegral(x1)- normalGaussIntegral(x2)));
+   c . g =(c . g *(normalGaussIntegral(x1)- normalGaussIntegral(x2)));
+   c . b =(c . b *(normalGaussIntegral(x1)- normalGaussIntegral(x2)));
+   c *=(params . OutputSize . y * params . SourceSize . w);
+   return c;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 FragColor;
+uniform sampler2D Source;
+
+void main()
+{
+ vec2 offset = fract((vTexCoord . xy * params . SourceSize . xy)- 0.5);
+ vec3 tempColor = vec3(0.0);
+
+   float range = ceil(0.5 + params . SourceSize . y / params . tvVerticalResolution);
+
+   float i;
+
+   if(params . noScanlines > 0.0)
+      for(i = - range;i < range + 2.0;i ++){
+         tempColor +=((texture(Source, vec2(vTexCoord . x, vTexCoord . y -(offset . y -(i))* params . SourceSize . w)). xyz)*(((3.14159265358 *(params . tvVerticalResolution * params . SourceSize . w)* min(abs((offset . y -(i)))+ 0.5, 1.0 /(params . tvVerticalResolution * params . SourceSize . w)))+ sin((3.14159265358 *(params . tvVerticalResolution * params . SourceSize . w)* min(abs((offset . y -(i)))+ 0.5, 1.0 /(params . tvVerticalResolution * params . SourceSize . w))))-(3.14159265358 *(params . tvVerticalResolution * params . SourceSize . w)* min(max(abs((offset . y -(i)))- 0.5, - 1.0 /(params . tvVerticalResolution * params . SourceSize . w)), 1.0 /(params . tvVerticalResolution * params . SourceSize . w)))- sin((3.14159265358 *(params . tvVerticalResolution * params . SourceSize . w)* min(max(abs((offset . y -(i)))- 0.5, - 1.0 /(params . tvVerticalResolution * params . SourceSize . w)), 1.0 /(params . tvVerticalResolution * params . SourceSize . w)))))/(2.0 * 3.14159265358)));
+      }
+   else
+      for(i = - range;i < range + 2.0;i ++){
+         tempColor +=(scanlines((offset . y -(i)),(texture(Source, vec2(vTexCoord . x, vTexCoord . y -(offset . y -(i))* params . SourceSize . w)). xyz)));
+      }
+ tempColor -= vec3(params . blackLevel);
+ tempColor *=(params . contrast / vec3(1.0 - params . blackLevel));
+   FragColor = vec4(tempColor, 1.0);
+}
